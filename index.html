@@ -1,1 +1,357 @@
-new test
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMJ – Majlis Ansarullah</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<nav class="fixed top-0 left-0 w-full bg-indigo-700 shadow-lg z-50">
+  <div class="container mx-auto py-4 flex justify-center">
+    <h1 class="text-2xl font-bold text-white">AMJ – Majlis Ansarullah Hannover</h1>
+  </div>
+</nav>
+
+<div class="container mx-auto p-6 pt-28">
+
+  <div class="flex flex-wrap gap-2 mb-4">
+    <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow">➕ Neuer Kontakt</button>
+    <button onclick="exportAllPDF()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow">📄 Export Gesamt-PDF</button>
+    <label class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg shadow cursor-pointer">
+        📂 CSV importieren
+        <input type="file" id="csvFile" accept=".csv" class="hidden" onchange="importCSV(event)">
+    </label>
+    <button onclick="openClearAllModal()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow">❌ Alles löschen</button>
+  </div>
+
+  <div class="overflow-x-auto bg-white rounded-xl shadow">
+  <table class="min-w-full table-auto border-collapse">
+    <thead class="bg-gray-200">
+      <tr>
+        <th class="px-4 py-2 text-left">Name</th>
+        <th class="px-4 py-2 text-left">Vorname</th>
+        <th class="px-4 py-2 text-left">Einkommen (€)</th>
+        <th class="px-4 py-2 text-left">Majlis</th>
+        <th class="px-4 py-2 text-left">Ijtema</th>
+        <th class="px-4 py-2 text-left">Ishaat</th>
+        <th class="px-4 py-2 text-left">Gesamt Jahr</th>
+        <th class="px-4 py-2">Musi</th>
+        <th class="px-4 py-2 text-left">Aktionen</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+      <h2 id="modalTitle" class="text-xl font-bold mb-4">Kontakt hinzufügen</h2>
+      <form id="contactForm" class="space-y-4">
+        <div>
+          <label class="block mb-1">Name</label>
+          <input type="text" id="name" class="w-full border px-3 py-2 rounded-lg" required>
+        </div>
+        <div>
+          <label class="block mb-1">Vorname</label>
+          <input type="text" id="vorname" class="w-full border px-3 py-2 rounded-lg" required>
+        </div>
+        <div>
+          <label class="block mb-1">Monatseinkommen (€)</label>
+          <input type="number" id="einkommen" class="w-full border px-3 py-2 rounded-lg" oninput="updatePreview()" required>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="checkbox" id="musi">
+          <label for="musi">Musi</label>
+        </div>
+
+        <div class="bg-gray-50 p-3 rounded-lg">
+          <p>💡 <b>Vorschau:</b></p>
+          <p id="previewMajlis">Majlis: 0.00 €</p>
+          <p id="previewIjtema">Ijtema: 0.00 €</p>
+          <p id="previewIshaat">Ishaat: 2.00 €</p>
+          <p id="previewGesamt">Gesamt Jahr: 0.00 €</p>
+        </div>
+
+        <div class="flex justify-end gap-2">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-lg border">Abbrechen</button>
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="detailModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+      <h2 class="text-xl font-bold mb-4">📄 Kontakt Details</h2>
+      <div id="detailContent" class="space-y-2"></div>
+      <div class="flex justify-between mt-4">
+        <button onclick="closeDetailModal()" class="px-4 py-2 border rounded-lg">Schließen</button>
+        <button onclick="exportDetailPDF()" class="px-4 py-2 bg-green-600 text-white rounded-lg">📄 Export als PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deleteModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+      <h2 class="text-lg font-bold mb-4">Kontakt löschen?</h2>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeDeleteModal()" class="px-4 py-2 border rounded-lg">Abbrechen</button>
+        <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg">Löschen</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="clearAllModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+      <h2 class="text-lg font-bold mb-4">Sicher, dass du alle Kontakte löschen möchtest?</h2>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeClearAllModal()" class="px-4 py-2 border rounded-lg">Abbrechen</button>
+        <button id="confirmClearAllBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg">Alle löschen</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let contacts = JSON.parse(localStorage.getItem('contacts')) || [];
+let editIndex = null;
+let detailIndex = null;
+let deleteIndex = null;
+
+// Berechnung
+function calculateValues(einkommen) {
+  const income = parseFloat(einkommen) || 0;
+  const majlis = income * 0.01;
+  const ijtema = income * 0.002085;
+  const ishaat = 2; // einmal im Jahr
+  const totalYear = majlis*12 + ijtema*12 + ishaat;
+  return { majlis, ijtema, ishaat, totalYear };
+}
+
+// Tabelle rendern
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  contacts.forEach((c, index) => {
+    const vals = calculateValues(c.einkommen);
+    tbody.innerHTML += `
+      <tr class="border-b">
+        <td class="px-4 py-2">${c.name}</td>
+        <td class="px-4 py-2">${c.vorname}</td>
+        <td class="px-4 py-2">${c.einkommen}</td>
+        <td class="px-4 py-2">${vals.majlis.toFixed(2)}</td>
+        <td class="px-4 py-2">${vals.ijtema.toFixed(2)}</td>
+        <td class="px-4 py-2">${vals.ishaat.toFixed(2)}</td>
+        <td class="px-4 py-2 font-bold text-green-600">${vals.totalYear.toFixed(2)}</td>
+        <td class="px-4 py-2 text-center">${c.musi ? '<span class="text-green-600 text-xl">✅</span>' : '<span class="text-red-600 text-xl">❌</span>'}</td>
+        <td class="px-4 py-2 flex gap-2">
+          <button onclick="openDetailModal(${index})" class="text-gray-700">🔍</button>
+          <button onclick="editContact(${index})" class="text-blue-600">✏️</button>
+          <button onclick="openDeleteModal(${index})" class="text-red-600">🗑️</button>
+        </td>
+      </tr>`;
+  });
+  localStorage.setItem('contacts', JSON.stringify(contacts));
+}
+
+// Modal Funktionen
+function openModal(edit=false) {
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('contactForm').reset();
+  document.getElementById('previewMajlis').textContent = 'Majlis: 0.00 €';
+  document.getElementById('previewIjtema').textContent = 'Ijtema: 0.00 €';
+  document.getElementById('previewIshaat').textContent = 'Ishaat: 2.00 €';
+  document.getElementById('previewGesamt').textContent = 'Gesamt Jahr: 0.00 €';
+  editIndex = null;
+  if (!edit) document.getElementById('modalTitle').textContent = 'Kontakt hinzufügen';
+}
+
+function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+function updatePreview() {
+  const einkommen = document.getElementById('einkommen').value;
+  const vals = calculateValues(einkommen);
+  document.getElementById('previewMajlis').textContent = `Majlis: ${vals.majlis.toFixed(2)} €`;
+  document.getElementById('previewIjtema').textContent = `Ijtema: ${vals.ijtema.toFixed(2)} €`;
+  document.getElementById('previewIshaat').textContent = `Ishaat: ${vals.ishaat.toFixed(2)} €`;
+  document.getElementById('previewGesamt').textContent = `Gesamt Jahr: ${vals.totalYear.toFixed(2)} €`;
+}
+
+// Formular speichern
+document.getElementById('contactForm').addEventListener('submit', function(e){
+  e.preventDefault();
+  const contact = {
+    name: document.getElementById('name').value,
+    vorname: document.getElementById('vorname').value,
+    einkommen: document.getElementById('einkommen').value,
+    musi: document.getElementById('musi').checked
+  };
+  if(editIndex !== null){ contacts[editIndex] = contact; } else { contacts.push(contact); }
+  renderTable();
+  closeModal();
+});
+
+// Edit
+function editContact(index){
+  const c = contacts[index];
+  openModal(true);
+  document.getElementById('modalTitle').textContent = 'Kontakt bearbeiten';
+  document.getElementById('name').value = c.name;
+  document.getElementById('vorname').value = c.vorname;
+  document.getElementById('einkommen').value = c.einkommen;
+  document.getElementById('musi').checked = c.musi;
+  updatePreview();
+  editIndex = index;
+}
+
+// Detail Modal
+function openDetailModal(index){
+  detailIndex = index;
+  const c = contacts[index];
+  const vals = calculateValues(c.einkommen);
+  const detail = `
+    <p><b>Name:</b> ${c.name}</p>
+    <p><b>Vorname:</b> ${c.vorname}</p>
+    <p><b>Majlis (Monat):</b> ${vals.majlis.toFixed(2)} €</p>
+    <p><b>Ijtema (Monat):</b> ${vals.ijtema.toFixed(2)} €</p>
+    <p><b>Ishaat (Monat):</b> ${vals.ishaat.toFixed(2)} €</p>
+    <p><b>Gesamter Restbetrag:</b> ${vals.totalYear.toFixed(2)} €</p>`;
+  document.getElementById('detailContent').innerHTML = detail;
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+function closeDetailModal(){ document.getElementById('detailModal').classList.add('hidden'); }
+
+// Löschen Modal
+function openDeleteModal(index){ 
+  deleteIndex = index; 
+  document.getElementById('deleteModal').classList.remove('hidden'); 
+}
+function closeDeleteModal(){ document.getElementById('deleteModal').classList.add('hidden'); }
+document.getElementById('confirmDeleteBtn').addEventListener('click', ()=>{
+  contacts.splice(deleteIndex,1);
+  renderTable();
+  closeDeleteModal();
+});
+
+// Alles löschen Modal Funktionen
+function openClearAllModal() {
+  document.getElementById('clearAllModal').classList.remove('hidden');
+}
+
+function closeClearAllModal() {
+  document.getElementById('clearAllModal').classList.add('hidden');
+}
+
+document.getElementById('confirmClearAllBtn').addEventListener('click', () => {
+  contacts = []; // Leert das Array
+  renderTable(); // Rendert die leere Tabelle
+  closeClearAllModal();
+});
+
+
+// PDF Export für Details
+function exportDetailPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const c = contacts[detailIndex];
+  const vals = calculateValues(c.einkommen);
+  
+  // Header
+  doc.setFontSize(18);
+  doc.text(`Majlis Ansarullah Chanda Details für ${c.vorname} ${c.name}`, 14, 20);
+  
+  const tableData = [
+    ["Name", `${c.vorname} ${c.name}`],
+    ["Monatseinkommen", `${c.einkommen} €`],
+    ["Majlis (monatlich)", `${vals.majlis.toFixed(2)} €`],
+    ["Ijtema (monatlich)", `${vals.ijtema.toFixed(2)} €`],
+    ["Ishaat (jährlich)", `${vals.ishaat.toFixed(2)} €`],
+    ["Gesamt Jahr", `${vals.totalYear.toFixed(2)} €`],
+  ];
+
+  doc.autoTable({
+    head: [['Feld', 'Wert']],
+    body: tableData,
+    startY: 30,
+    theme: 'striped',
+    headStyles: { fillColor: [52, 73, 94] }
+  });
+
+  doc.save('Kontakt_Detail.pdf');
+}
+
+function exportAllPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  
+  // Header
+  doc.setFontSize(18);
+  doc.text("AMJ – Ansarullah Kontakte", 14, 20);
+  
+  // Table Data
+  const tableData = contacts.map(c => {
+    const vals = calculateValues(c.einkommen);
+    const musi = c.musi ? 'Ja' : 'Nein';
+    return [
+      c.name, 
+      c.vorname, 
+      c.einkommen, 
+      vals.majlis.toFixed(2), 
+      vals.ijtema.toFixed(2), 
+      vals.ishaat.toFixed(2), 
+      vals.totalYear.toFixed(2), 
+      musi
+    ];
+  });
+
+  // Table Headers
+  const tableHeaders = [
+    ["Name", "Vorname", "Einkommen (€)", "Majlis (€)", "Ijtema (€)", "Ishaat (€)", "Gesamt Jahr (€)", "Musi"]
+  ];
+
+  // Generate Table using autoTable plugin
+  doc.autoTable({
+    head: tableHeaders,
+    body: tableData,
+    startY: 30,
+    theme: 'striped',
+    headStyles: { fillColor: [52, 73, 94] },
+    columnStyles: {
+        2: { halign: 'right' }, 
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+        6: { halign: 'right' }
+    }
+  });
+
+  doc.save('Kontakte_Gesamt.pdf');
+}
+
+// CSV Import
+function importCSV(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const text = e.target.result;
+    const rows = text.split('\n').filter(r=>r.trim()!=='');
+    rows.forEach((row,i)=>{
+      if(i===0) return; // Kopfzeile
+      const [name,vorname,einkommen,musi] = row.split(',');
+      contacts.push({name:name.trim(),vorname:vorname.trim(),einkommen:einkommen.trim(),musi:musi.trim().toLowerCase()==='true'});
+    });
+    renderTable();
+  }
+  reader.readAsText(file);
+}
+
+// Initial render
+renderTable();
+</script>
+</body>
+</html>
